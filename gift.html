@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚙️ Panel Operator - Battle Ring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body { font-family: 'Nunito', sans-serif; background-color: #f3f4f6; }
+        .modal { display: none; backdrop-filter: blur(5px); }
+        .modal.active { display: flex; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+
+    <div class="max-w-7xl mx-auto flex flex-col gap-6">
+        
+        <!-- BARIS ATAS: TikTok & Header -->
+        <div class="flex flex-col md:flex-row gap-6">
+            <!-- PANEL KONEKSI TIKTOK -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-cyan-500 flex-1 flex flex-col justify-center">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-black text-gray-800">📡 Koneksi TikTok Live</h2>
+                        <p id="operator-tiktok-status" class="text-sm font-bold text-gray-400 mt-1">Status: <span class="text-red-500">🔴 Belum Terhubung</span></p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="tiktok-input" placeholder="Username (tanpa @)..." class="w-full border-2 border-gray-200 rounded-lg px-4 py-2 font-bold outline-none focus:border-cyan-500 text-gray-700">
+                    <button onclick="submitTikTokUsername()" class="px-5 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg shadow transition-all">Connect</button>
+                    <button onclick="disconnectTikTok()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg shadow transition-all">Disconnect</button>
+                </div>
+            </div>
+
+            <!-- PANEL PINTASAN & INFO -->
+            <div class="flex flex-col justify-center bg-white p-6 rounded-2xl shadow-sm flex-1 border-l-4 border-yellow-500">
+                <h1 class="text-2xl font-black text-gray-800 mb-2">⚙️ Panel Kontrol Arena</h1>
+                <p id="target-info-text" class="text-gray-500 font-bold mb-4">Membaca Aturan dari Server...</p>
+                <div class="flex gap-3">
+                    <a href="index.html" target="_blank" class="px-4 py-2 bg-blue-100 text-blue-700 font-bold rounded-lg hover:bg-blue-200 transition text-center flex-1">📺 Buka Layar Arena</a>
+                    <button onclick="openAddModal()" class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg shadow hover:bg-green-600 transition flex-1">+ Tambah User Manual</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARIS BAWAH -->
+        <div class="flex flex-col md:flex-row gap-6">
+            
+            <!-- KOLOM 1: MANAJEMEN USER -->
+            <div class="flex-1 flex flex-col gap-6">
+                <!-- PANEL MANAJEMEN DATA -->
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden flex-1 flex flex-col">
+                    <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                        <h2 class="font-black text-gray-800 text-lg">👥 Daftar Penonton</h2>
+                        <button onclick="resetAllUsers()" class="px-3 py-1 bg-red-100 text-red-600 border border-red-300 font-bold text-xs rounded-lg shadow-sm hover:bg-red-200 transition">🗑️ Reset Semua</button>
+                    </div>
+                    <div class="overflow-y-auto max-h-[60vh] custom-scroll">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-500 text-xs uppercase tracking-wider sticky top-0 shadow-sm z-10">
+                                    <th class="p-3 font-bold border-b">Nama User</th>
+                                    <th class="p-3 font-bold border-b text-center">Tiket</th>
+                                    <th class="p-3 font-bold border-b">Manual Add</th>
+                                    <th class="p-3 font-bold border-b text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-table-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                        <div id="empty-state" class="hidden p-10 text-center text-gray-400 font-bold">Arena masih kosong.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KOLOM 2: PENGATURAN & DEKORASI -->
+            <div class="w-full md:w-80 flex flex-col gap-6">
+                
+                <!-- NEW: PANEL PENGATURAN MEKANIK DINAMIS (TERHUBUNG KE BACKEND) -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm flex flex-col border-t-4 border-green-500">
+                    <h2 class="text-lg font-black text-green-600 mb-4 flex items-center gap-2">⚙️ Aturan & Mekanik</h2>
+                    
+                    <div class="flex flex-col gap-3">
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <label class="text-xs font-black text-gray-700 block mb-1">🎟️ Syarat 1 Tiket Antrean</label>
+                            <div class="flex gap-2 items-center mb-2">
+                                <input type="number" id="conf-target-gifts" min="1" class="w-16 p-1 border rounded text-sm text-center font-bold"> <span class="text-xs font-bold text-gray-600">Mawar 🌹</span>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <input type="number" id="conf-target-likes" min="1" class="w-16 p-1 border rounded text-sm text-center font-bold"> <span class="text-xs font-bold text-gray-600">Tap Layar ❤️</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <label class="text-xs font-black text-gray-700 block mb-1">💖 Syarat Tambah HP (XP)</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="number" id="conf-heal-like" min="1" class="w-16 p-1 border rounded text-sm text-center font-bold"> 
+                                <span class="text-xs font-bold text-gray-600">Tap = +1 HP</span>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <label class="text-xs font-black text-gray-700 block mb-1">⚔️ Power / Damage Pukulan</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="number" id="conf-damage" min="1" max="10" class="w-16 p-1 border rounded text-sm text-center font-bold"> 
+                                <span class="text-xs font-bold text-gray-600">Power (1 - 10)</span>
+                            </div>
+                        </div>
+                        
+                        <button onclick="saveConfig()" class="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-all shadow">
+                            💾 Terapkan Realtime
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PANEL DEKORASI -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm flex flex-col border-t-4 border-purple-500">
+                    <h2 class="text-lg font-black text-purple-600 mb-2 flex items-center gap-2">🖼️ Dekorasi Sponsor</h2>
+                    <div class="flex flex-col gap-3 overflow-y-auto max-h-[30vh] pr-2 custom-scroll">
+                        <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">📺 Videotron Belakang (16:9)</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'videotron')" class="text-xs w-full">
+                        </div>
+                        <div class="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">🖥️ Layar Jumbotron Atas (2:1)</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'jumbotron')" class="text-xs w-full">
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">🥊 Ring Sisi Depan (4:1)</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'banner1')" class="text-xs w-full">
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">🥊 Ring Sisi Belakang</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'banner2')" class="text-xs w-full">
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">🥊 Ring Sisi Kiri</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'banner3')" class="text-xs w-full">
+                        </div>
+                        <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <h3 class="text-sm font-black text-gray-800 mb-1">🥊 Ring Sisi Kanan</h3>
+                            <input type="file" accept="image/*" onchange="uploadImage(event, 'banner4')" class="text-xs w-full">
+                        </div>
+                    </div>
+                    <button onclick="resetSponsors()" class="mt-4 w-full px-4 py-2 bg-gray-200 text-gray-600 font-bold text-xs rounded-lg hover:bg-red-100 hover:text-red-500 transition">Hapus Semua Dekorasi</button>
+                </div>
+            </div>
+
+            <!-- KOLOM 3: RIWAYAT -->
+            <div class="w-full md:w-64">
+                <div class="bg-white p-5 rounded-2xl shadow-sm h-full max-h-[80vh] flex flex-col border-t-4 border-red-500">
+                    <h2 class="text-lg font-black text-red-500 mb-4 flex items-center gap-2">🥊 Riwayat K.O</h2>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-[10px] font-bold text-gray-400">Live Log</span>
+                        <button onclick="clearHistory()" class="text-[10px] text-red-400 hover:text-red-600 underline">Hapus Riwayat</button>
+                    </div>
+                    <div id="operator-history" class="flex flex-col gap-2 overflow-y-auto flex-1 custom-scroll"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="addModal" class="modal fixed inset-0 z-50 bg-black/40 items-center justify-center">
+        <div class="bg-white p-6 rounded-2xl shadow-xl w-96">
+            <h2 class="text-xl font-black mb-4">Tambah User Baru</h2>
+            <input type="text" id="add-username" placeholder="Nama User..." class="w-full border-2 border-gray-200 rounded-lg px-4 py-2 mb-4 font-bold outline-none focus:border-blue-500">
+            <input type="number" id="add-gift" placeholder="Total Mawar Awal" class="w-full border-2 border-gray-200 rounded-lg px-4 py-2 mb-4 font-bold outline-none focus:border-blue-500">
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeModals()" class="px-4 py-2 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300">Batal</button>
+                <button onclick="addUser()" class="px-4 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // STATE CONFIG (Dikendalikan oleh Server)
+        // ==========================================
+        let CONFIG = { targetGifts: 5, targetLikes: 30, likesForOneHp: 5, damagePower: 1 };
+
+        // ==========================================
+        // KOMUNIKASI SERVER TIKTOK
+        // ==========================================
+        let socket;
+        try {
+            socket = io('http://localhost:3000');
+            
+            socket.on('tiktok-status', (data) => {
+                const statusText = document.getElementById('operator-tiktok-status');
+                if(data.connected) statusText.innerHTML = `Status: <span class="text-green-500 font-black">🟢 Terhubung ke @${data.username}</span>`;
+                else statusText.innerHTML = `Status: <span class="text-red-500 font-black">🔴 Terputus</span> ${data.error ? '<br><span class="text-xs text-gray-500">'+data.error+'</span>' : ''}`;
+            });
+
+            // MENDENGARKAN CONFIG DARI SERVER (BACKEND)
+            socket.on('config-update', (newConfig) => {
+                CONFIG = newConfig;
+                
+                // Perbarui isi form di UI
+                document.getElementById('conf-target-gifts').value = CONFIG.targetGifts;
+                document.getElementById('conf-target-likes').value = CONFIG.targetLikes;
+                document.getElementById('conf-heal-like').value = CONFIG.likesForOneHp;
+                document.getElementById('conf-damage').value = CONFIG.damagePower;
+
+                const infoEl = document.getElementById('target-info-text');
+                if(infoEl) infoEl.innerText = `1 Tiket = ${CONFIG.targetGifts} Mawar 🌹 ATAU ${CONFIG.targetLikes} Tap ❤️`;
+                
+                renderData(); // Refresh UI tabel karena aturan tiket mungkin berubah
+            });
+
+        } catch(e) { console.error("Gagal terhubung ke Localhost:3000"); }
+
+        function submitTikTokUsername() {
+            const username = document.getElementById('tiktok-input').value.trim();
+            if(username) {
+                document.getElementById('operator-tiktok-status').innerHTML = 'Status: <span class="text-yellow-500 font-black">⏳ Menghubungkan...</span>';
+                socket.emit('set-tiktok-username', username);
+            } else alert('Harap ketik username TikTok terlebih dahulu!');
+        }
+
+        function disconnectTikTok() {
+            if(confirm("Yakin ingin memutus koneksi dari TikTok Live?")) socket.emit('disconnect-tiktok');
+        }
+
+        // FUNGSI MENYIMPAN PENGATURAN KE SERVER
+        function saveConfig() {
+            const newConfig = {
+                targetGifts: Math.max(1, parseInt(document.getElementById('conf-target-gifts').value) || 1),
+                targetLikes: Math.max(1, parseInt(document.getElementById('conf-target-likes').value) || 1),
+                likesForOneHp: Math.max(1, parseInt(document.getElementById('conf-heal-like').value) || 1),
+                damagePower: Math.max(1, Math.min(10, parseInt(document.getElementById('conf-damage').value) || 1))
+            };
+            
+            // Emit perubahan ke server, biarkan server mendistribusikannya ke Arena 3D
+            socket.emit('update-config', newConfig);
+            
+            // Beri notifikasi visual kecil tanpa mengganggu
+            const btn = document.querySelector('button[onclick="saveConfig()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "✅ Tersimpan di Server!";
+            btn.classList.add("bg-green-700");
+            setTimeout(() => { btn.innerHTML = originalText; btn.classList.remove("bg-green-700"); }, 1500);
+        }
+
+        // ==========================================
+        // UPLOAD GAMBAR SPONSOR 
+        // ==========================================
+        const SPONSOR_KEY = 'voxel_sponsors_data';
+
+        function uploadImage(event, slotKey) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 512;
+                    let scaleSize = MAX_WIDTH / img.width;
+                    if(scaleSize > 1) scaleSize = 1; 
+                    canvas.width = img.width * scaleSize; canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    let sponsors = JSON.parse(localStorage.getItem(SPONSOR_KEY) || '{}');
+                    sponsors[slotKey] = dataUrl;
+                    localStorage.setItem(SPONSOR_KEY, JSON.stringify(sponsors));
+                    window.dispatchEvent(new Event('storage'));
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function resetSponsors() {
+            if(confirm("Hapus semua gambar dekorasi dan kembali ke warna default?")) {
+                localStorage.removeItem(SPONSOR_KEY); window.dispatchEvent(new Event('storage')); 
+                document.querySelectorAll('input[type=file]').forEach(input => input.value = ''); 
+            }
+        }
+
+        // ==========================================
+        // LOGIKA MANAJEMEN USER
+        // ==========================================
+        const STORAGE_KEY = 'voxel_users_data';
+        const HISTORY_KEY = 'voxel_fight_history';
+
+        function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+        function saveUsers(users) { localStorage.setItem(STORAGE_KEY, JSON.stringify(users)); renderData(); }
+
+        function resetAllUsers() {
+            if(confirm("⚠️ PERINGATAN: Menghapus SEMUA penonton dari Arena secara permanen. Lanjutkan?")) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({})); renderData();
+            }
+        }
+
+        function renderData() {
+            const users = getUsers();
+            const tbody = document.getElementById('user-table-body');
+            const emptyState = document.getElementById('empty-state');
+            
+            tbody.innerHTML = '';
+            const userArray = Object.entries(users).sort((a, b) => (b[1].gifts || 0) - (a[1].gifts || 0));
+
+            if(userArray.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                
+                userArray.forEach(([name, data]) => {
+                    const totalGifts = data.gifts || 0;
+                    const totalLikes = data.likes || 0;
+                    const fightsDone = data.fights || 0;
+                    
+                    // Hitung tiket berdasarkan CONFIG DINAMIS DARI SERVER
+                    const tGifts = Math.floor(totalGifts / Math.max(1, CONFIG.targetGifts));
+                    const tLikes = Math.floor(totalLikes / Math.max(1, CONFIG.targetLikes));
+                    const ticketsAvailable = (tGifts + tLikes) - fightsDone;
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-blue-50/50 transition";
+                    tr.innerHTML = `
+                        <td class="p-3 text-sm font-black text-gray-800">
+                            ${name} <br>
+                            <span class="text-[10px] text-pink-500 font-bold">${totalGifts} 🌹</span> | 
+                            <span class="text-[10px] text-red-500 font-bold">${totalLikes} ❤️</span>
+                        </td>
+                        <td class="p-3 text-center">
+                            <div class="inline-block px-2 py-1 ${ticketsAvailable > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'} rounded font-bold text-xs">
+                                🎟️ ${ticketsAvailable}
+                            </div>
+                        </td>
+                        <td class="p-3">
+                            <div class="flex gap-1">
+                                <button onclick="addGift('${name}', ${CONFIG.targetGifts}, 'gift')" class="px-2 py-1 bg-pink-500 text-white font-bold text-[10px] rounded hover:bg-pink-600">+${CONFIG.targetGifts}🌹</button>
+                                <button onclick="addGift('${name}', ${CONFIG.targetLikes}, 'like')" class="px-2 py-1 bg-red-500 text-white font-bold text-[10px] rounded hover:bg-red-600">+${CONFIG.targetLikes}❤️</button>
+                            </div>
+                        </td>
+                        <td class="p-3 text-right">
+                            <button onclick="promptEditGift('${name}')" class="px-2 py-1 border text-gray-600 font-bold text-[10px] rounded hover:bg-gray-100">✏️</button>
+                            <button onclick="deleteUser('${name}')" class="px-2 py-1 bg-red-100 text-red-600 font-bold text-[10px] rounded hover:bg-red-200">❌</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            const historyData = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+            const historyBox = document.getElementById('operator-history');
+            historyBox.innerHTML = '';
+            if(historyData.length === 0) {
+                historyBox.innerHTML = '<div class="text-center text-gray-400 text-xs mt-4">Belum ada riwayat.</div>';
+            } else {
+                [...historyData].reverse().forEach(hist => {
+                    historyBox.insertAdjacentHTML('beforeend', `
+                        <div class="p-2 border-l-4 border-red-500 bg-red-50 rounded-r-lg text-xs mb-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-black text-green-600">🏆 ${hist.winner}</span>
+                                <span class="text-[9px] text-gray-400">${hist.time}</span>
+                            </div>
+                            <div class="text-gray-600 text-[10px]">KO -> <span class="font-bold text-red-500">${hist.loser}</span></div>
+                        </div>
+                    `);
+                });
+            }
+        }
+
+        function addGift(name, amount, type) {
+            const users = getUsers();
+            if(users[name]) {
+                if (type === 'gift') users[name].gifts = (users[name].gifts || 0) + amount;
+                if (type === 'like') users[name].likes = (users[name].likes || 0) + amount;
+                saveUsers(users);
+                // Trigger event agar index.html langsung merefresh bar antrean dan angka 3D
+                window.dispatchEvent(new Event('storage'));
+            }
+        }
+
+        function promptEditGift(name) {
+            const users = getUsers();
+            const newVal = prompt(`Set total Mawar manual untuk ${name}:`, users[name].gifts || 0);
+            if(newVal !== null && !isNaN(parseInt(newVal))) {
+                users[name].gifts = parseInt(newVal);
+                saveUsers(users);
+                window.dispatchEvent(new Event('storage'));
+            }
+        }
+
+        function deleteUser(name) {
+            if(confirm(`Yakin ingin menghapus ${name}?`)) { 
+                const users = getUsers(); 
+                delete users[name]; 
+                saveUsers(users); 
+                window.dispatchEvent(new Event('storage'));
+            }
+        }
+
+        function clearHistory() {
+            if(confirm("Hapus semua riwayat pertarungan?")) { localStorage.removeItem(HISTORY_KEY); renderData(); }
+        }
+
+        function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+        function openAddModal() { document.getElementById('add-username').value = ''; document.getElementById('add-gift').value = ''; document.getElementById('addModal').classList.add('active'); document.getElementById('add-username').focus(); }
+
+        function addUser() {
+            const name = document.getElementById('add-username').value.trim();
+            const gift = parseInt(document.getElementById('add-gift').value) || 0;
+            if(!name) return alert("Nama tidak boleh kosong!");
+            const users = getUsers();
+            if(users[name]) return alert("Nama user sudah ada!");
+
+            users[name] = { gifts: gift, likes: 0, fights: 0, lastActive: Date.now() }; 
+            saveUsers(users); 
+            closeModals();
+            window.dispatchEvent(new Event('storage'));
+        }
+
+        // INIT
+        renderData();
+        window.addEventListener('storage', () => { renderData(); }); 
+    </script>
+</body>
+</html>
