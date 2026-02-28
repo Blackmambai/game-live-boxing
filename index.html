@@ -130,7 +130,7 @@
         let socket;
         function initSocketListener() {
             try {
-                socket = io('http://localhost:3000');
+                socket = io();
                 socket.on('tiktok-status', (data) => { const statusBtn = document.getElementById('tiktok-status'); if(data.connected) { statusBtn.innerText = `🎵 Live: @${data.username}`; statusBtn.classList.replace('text-gray-400', 'text-cyan-300'); statusBtn.classList.replace('text-red-400', 'text-cyan-300'); statusBtn.classList.replace('bg-black/40', 'bg-cyan-900/50'); statusBtn.classList.replace('bg-red-900/50', 'bg-cyan-900/50'); statusBtn.classList.add('border-cyan-500'); } else { statusBtn.innerText = "🎵 TikTok: Menunggu Operator"; statusBtn.classList.replace('text-cyan-300', 'text-gray-400'); statusBtn.classList.replace('bg-cyan-900/50', 'bg-black/40'); statusBtn.classList.remove('border-cyan-500'); } });
                 socket.on('tiktok-join', (data) => { processJoin(data.username); }); 
                 socket.on('tiktok-gift', (data) => { processDonation(data.username, data.amount, 'gift'); }); 

@@ -1,5 +1,5 @@
 // ==========================================
-// KODE SERVER PENJEMBATAN TIKTOK LIVE (DINAMIS)
+// KODE SERVER PENJEMBATAN TIKTOK LIVE (VERSI DEPLOY RAILWAY)
 // ==========================================
 const { WebcastPushConnection } = require('tiktok-live-connector');
 const { Server } = require('socket.io');
@@ -9,9 +9,11 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
+// CORS diatur agar bisa menerima koneksi dari domain Railway
 const io = new Server(server, { cors: { origin: "*" } });
 
-// Mengizinkan server membaca file HTML statis kita
+// Mengizinkan server membaca file HTML statis kita (index.html & gift.html)
 app.use(express.static(__dirname));
 
 // Rute untuk Layar Utama Arena
@@ -22,6 +24,11 @@ app.get('/', (req, res) => {
 // Rute untuk Panel Operator
 app.get('/operator', (req, res) => {
     res.sendFile(path.join(__dirname, 'gift.html'));
+});
+
+// Rute Health Check (Sangat berguna untuk platform cloud seperti Railway memantau status aplikasi)
+app.get('/health', (req, res) => {
+    res.status(200).send('Server is healthy and running!');
 });
 
 let tiktokLiveConnection = null;
@@ -38,7 +45,7 @@ let arenaConfig = {
 };
 
 io.on('connection', (socket) => {
-    console.log("🌐 Browser terhubung ke server mesin.");
+    console.log("🌐 Klien (Browser) terhubung ke server backend.");
 
     // Kirim status & config saat ini ke browser yang baru buka
     socket.emit('tiktok-status', { 
@@ -101,7 +108,9 @@ io.on('connection', (socket) => {
     });
 });
 
+// Railway otomatis memberikan environment variable PORT.
+// Penggunaan '0.0.0.0' diwajibkan untuk kontainer cloud (seperti Docker/Railway)
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server berjalan online di port ${PORT}`);
 });
