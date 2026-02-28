@@ -3,8 +3,26 @@
 // ==========================================
 const { WebcastPushConnection } = require('tiktok-live-connector');
 const { Server } = require('socket.io');
+const express = require('express');
+const http = require('http');
+const path = require('path');
 
-const io = new Server(3000, { cors: { origin: "*" } });
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+// Mengizinkan server membaca file HTML statis kita
+app.use(express.static(__dirname));
+
+// Rute untuk Layar Utama Arena
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Rute untuk Panel Operator
+app.get('/operator', (req, res) => {
+    res.sendFile(path.join(__dirname, 'gift.html'));
+});
 
 let tiktokLiveConnection = null;
 let currentUsername = "";
@@ -15,8 +33,8 @@ let currentUsername = "";
 let arenaConfig = {
     targetGifts: 5,
     targetLikes: 30,
-    likesForOneHp: 15,
-    damagePower: 1,
+    likesForOneHp: 5,
+    damagePower: 1
 };
 
 io.on('connection', (socket) => {
@@ -83,5 +101,7 @@ io.on('connection', (socket) => {
     });
 });
 
-console.log("🚀 Server Mesin menyala di port 3000.");
-console.log("👉 Silakan buka Panel Operator (gift.html) untuk mengatur koneksi.");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 Server berjalan online di port ${PORT}`);
+});
